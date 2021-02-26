@@ -1,0 +1,68 @@
+- hosts: all
+  vars_files:
+   - web_var.yml
+  tasks:
+  - name: "Creating dvd mount point directory"
+    file:
+     state: directory
+     path: "{{dvd_dir}}"
+
+  - name: "Mounting the dvd"
+    mount:
+     src: "/dev/cdrom"
+     path: "{{dvd_dir}}"
+     state: mounted
+     fstype: "iso9660"
+
+  - name: "YUM Configurartion for AppStream"
+    yum_repository:
+      name: "dvd1"
+      description: "AppStream"
+      baseurl: "{{dvd_dir}}/AppStream"
+      gpgcheck: no
+
+  - name: "YUM Configurartion for BaseOS"
+    yum_repository:
+      name: "dvd2"
+      description: "BaseOS"
+      baseurl: "{{dvd_dir}}/BaseOS"
+      gpgcheck: no
+
+  - name: "Installing httpd package"
+    package:
+     name: "httpd"
+     state: present
+
+  - name: "Creating Document root for httpd"
+    file:
+      state: directory
+      path: "{{doc_root}}"
+
+  - name: "Copying apache config. file"
+    template:
+     dest: "/etc/httpd/conf.d/lw.conf"
+     src: "lw.conf"
+    notify:
+        - Restart Apache
+
+  - name: "Copying the content to the file"
+    copy:
+      src: "lw.html"
+      dest: "{{doc_root}}/index.html"
+
+  - name: "Exposing http port"
+    firewalld:
+      port: "{{http_port}}/tcp"
+      state: enabled
+      permanent: yes
+      immediate: yes
+
+  - name: "Starting httpd service"
+    service:
+      name: "httpd"
+      state: started
+  handlers:
+  - name: "Restart Apache"
+    service:
+      name: "httpd"
+      state: restarted
